@@ -1,0 +1,208 @@
+Skip to content
+ 
+Search…
+All gists
+Back to GitHub
+@chilukoti-jaya
+chilukoti-jaya/gist:84b4bfd3099ed2dfc16797f1587a2172 Secret
+Created 1 minute ago
+Code
+Revisions
+1
+Clone this repository at &lt;script src=&quot;https://gist.github.com/chilukoti-jaya/84b4bfd3099ed2dfc16797f1587a2172.js&quot;&gt;&lt;/script&gt;
+<script src="https://gist.github.com/chilukoti-jaya/84b4bfd3099ed2dfc16797f1587a2172.js"></script>
+log4j2-json
+gistfile1.txt
+Add Log4j2 dependency
+First, you need to add the Log4j2 dependency to your Spring Boot project's pom.xml file:
+<dependency>
+    <groupId>org.apache.logging.log4j</groupId>
+    <artifactId>log4j-core</artifactId>
+    <version>2.17.2</version>
+</dependency>
+Configure Log4j2
+Create a log4j2.xml file in the src/main/resources directory of your project to configure Log4j2. Here's an example configuration:
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+    <Appenders>
+        <Console name="ConsoleAppender" target="SYSTEM_OUT">
+            <PatternLayout>
+                <Pattern>%d{yyyy-MM-dd HH:mm:ss} [%t] %-5level %logger{36} - %msg%n</Pattern>
+            </PatternLayout>
+        </Console>
+        <File name="FileAppender" fileName="logs/application.log">
+            <PatternLayout>
+                <Pattern>%d{yyyy-MM-dd HH:mm:ss} [%t] %-5level %logger{36} - %msg%n</Pattern>
+            </PatternLayout>
+        </File>
+    </Appenders>
+    <Loggers>
+        <Root level="info">
+            <AppenderRef ref="ConsoleAppender" />
+            <AppenderRef ref="FileAppender" />
+        </Root>
+    </Loggers>
+</Configuration>
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+    <Appenders>
+        <Console name="ConsoleAppender" target="SYSTEM_OUT">
+            <PatternLayout>
+                <Pattern>%d{yyyy-MM-dd HH:mm:ss} [%t] %-5level %logger{36} - %msg%n</Pattern>
+            </PatternLayout>
+        </Console>
+        <File name="FileAppender" fileName="logs/application.log">
+            <PatternLayout>
+                <Pattern>%d{yyyy-MM-dd HH:mm:ss} [%t] %-5level %logger{36} - %msg%n</Pattern>
+            </PatternLayout>
+        </File>
+    </Appenders>
+    <Loggers>
+        <Root level="info">
+            <AppenderRef ref="ConsoleAppender" />
+            <AppenderRef ref="FileAppender" />
+        </Root>
+    </Loggers>
+</Configuration>
+This configuration sets up two appenders: one for console output and one for writing logs to a file (logs/application.log). You can adjust the log level and log pattern according to your needs.
+
+Create a JSON template file
+Create a JSON template file that will serve as the base structure for the generated JSON file. This file can be placed in the resources folder of your Spring Boot project. For example, let's create a file named log-template.json with the following content:
+{
+  "logFiles": [
+    {
+      "fileName": "",
+      "logEntries": []
+    }
+  ]
+}
+Create a utility class or service
+Next, create a utility class or a service that will handle the generation of the JSON file. This class will read the application log files using Log4j2, parse their content, and populate the JSON template with the log entries. Here's an example implementation:
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.config.Configuration;
+import org.apache.logging.log4j.core.config.ConfigurationFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@Service
+public class LogJsonGeneratorService {
+
+    @Value("${app.logs.directory}")
+    private String logDirectory;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public void generateLogJson() throws IOException {
+        // Read the JSON template
+        Map<String, Object> jsonTemplate = readJsonTemplate();
+
+        // Get the list of log events
+        List<LogEvent> logEvents = getLogEvents();
+
+        // Populate the JSON template with log entries
+        populateLogEntries(jsonTemplate, logEvents);
+
+        // Write the populated JSON template to a new file
+        writeJsonFile(jsonTemplate);
+    }
+
+    private Map<String, Object> readJsonTemplate() throws IOException {
+        String jsonTemplate = new String(Files.readAllBytes(Paths.get("src/main/resources/log-template.json")));
+        return objectMapper.readValue(jsonTemplate, new TypeReference<Map<String, Object>>() {});
+    }
+
+    private List<LogEvent> getLogEvents() {
+        LoggerContext loggerContext = LoggerContext.getContext(false);
+        Configuration configuration = ConfigurationFactory.getInstance().getConfiguration(loggerContext);
+        return configuration.getLoggers().values().stream()
+                .flatMap(logger -> logger.getEntries().stream())
+                .flatMap(logEventData -> logEventData.stream())
+                .collect(Collectors.toList());
+    }
+
+    private void populateLogEntries(Map<String, Object> jsonTemplate, List<LogEvent> logEvents) {
+        List<Map<String, Object>> logFileEntries = (List<Map<String, Object>>) jsonTemplate.get("logFiles");
+
+        for (LogEvent logEvent : logEvents) {
+            Map<String, Object> logEntry = new HashMap<>();
+            logEntry.put("fileName", logEvent.getLoggerName());
+            logEntry.put("timestamp", logEvent.getTimeMillis());
+            logEntry.put("level", logEvent.getLevel().toString());
+            logEntry.put("message", logEvent.getMessage().getFormattedMessage());
+            logFileEntries.get(0).get("logEntries").add(logEntry);
+        }
+    }
+
+    private void writeJsonFile(Map<String, Object> jsonTemplate) throws IOException {
+        String jsonContent = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(jsonTemplate);
+        Files.write(Paths.get("generated-logs.json"), jsonContent.getBytes());
+    }
+}
+This LogJsonGeneratorService class has the following methods:
+
+generateLogJson(): The main method that orchestrates the generation of the JSON file.
+readJsonTemplate(): Reads the JSON template file (log-template.json) from the resources folder.
+getLogEvents(): Gets a list of log events from Log4j2 using the LoggerContext and Configuration classes.
+populateLogEntries(): Populates the JSON template with log file names, timestamps, log levels, and log messages from the log events.
+writeJsonFile(): Writes the populated JSON template to a new file named generated-logs.json.
+Configure the log directory
+In the example above, the log directory path is read from a configuration property app.logs.directory. You'll need to set this property in your application.properties or application.yml file. For example:
+# application.properties
+app.logs.directory=/path/to/your/logs
+Invoke the JSON generation
+Finally, you need to invoke the generateLogJson() method of the LogJsonGeneratorService at the appropriate time in your application. You can do this in a scheduled task, a separate command, or any other suitable place in your application logic.
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+import java.io.IOException;
+
+@SpringBootApplication
+public class YourApplication implements CommandLineRunner {
+
+    @Autowired
+    private LogJsonGeneratorService logJsonGeneratorService;
+
+    public static void main(String[] args) {
+        SpringApplication.run(YourApplication.class, args);
+    }
+
+    @Override
+    public void run(String... args) throws IOException {
+        logJsonGeneratorService.generateLogJson();
+    }
+}
+In this example, the generateLogJson() method is invoked in the run() method of the CommandLineRunner interface, which is executed when the Spring Boot application starts. You can modify this logic based on your requirements.
+After running the application, a new JSON file named generated-logs.json will be created in the project root directory, containing the log file names, timestamps, log levels, log messages,
+@chilukoti-jaya
+Comment
+ 
+Leave a comment
+ 
+Footer
+© 2024 GitHub, Inc.
+Footer navigation
+Terms
+Privacy
+Security
+Status
+Docs
+Contact
+Manage cookies
+Do not share my personal information
